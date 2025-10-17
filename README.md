@@ -1,39 +1,73 @@
-# Wyoming Piper
+# Wyoming macOS TTS
 
-[Wyoming protocol](https://github.com/rhasspy/wyoming) server for the [Piper](https://github.com/rhasspy/piper/) text to speech system.
+[Wyoming protocol](https://github.com/rhasspy/wyoming) server for Text-to-Speech on macOS, using the `say` built-in command to generate speech natively on Apple silicon for voice pipelines in Home Assistant.
 
-## Home Assistant Add-on
+## Features
+- Single install command to run in the background and automatically on login
+- Supports multiple languages and voices
+- Supports streaming
 
-[![Show add-on](https://my.home-assistant.io/badges/supervisor_addon.svg)](https://my.home-assistant.io/redirect/supervisor_addon/?addon=core_piper)
+For Speech-to-Text on macOS, check out [wyoming-macos-stt](https://github.com/openhoster/wyoming-macos-stt)
 
-[Source](https://github.com/home-assistant/addons/tree/master/piper)
+## Getting Started
 
-## Local Install
+### Requirements
+- macOS 26
+- [uv](https://github.com/astral-sh/uv)
+- [ffmpeg](https://github.com/FFmpeg/FFmpeg)
 
-Clone the repository and set up Python virtual environment:
+> These can be installed using [Homebrew](https://brew.sh) - `brew install uv ffmpeg`
 
-``` sh
-git clone https://github.com/rhasspy/wyoming-piper.git
-cd wyoming-piper
-script/setup
-```
+### Installing
 
-Install Piper
-```sh
-curl -L -s "https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz" | tar -zxvf - -C /usr/share
-```
+1. Clone this repository and navigate into it:
+    ```bash
+    git clone https://github.com/openhoster/wyoming-macos-tts
+    cd wyoming-macos-tts
+    ```
+2. Run the installer and follow the prompts:
+    ```bash
+    uv run script/install.py
+    ```
+    This will create a launcher file and optionally set it to run in the background and on login.
+    
+    By default the server will be available externally for devices on the local network. You can change this and other arguments by editing the launcher file `WyomingTTS`. 
 
-Run a server that anyone can connect to:
+    Streaming is disabled by default, to enable it add `--streaming` in the launcher file.
+    
+    > To see all the available arguments, run: `uv run -m wyoming_macos_tts --help`
+3. Adding to Home Assistant:  
+   Add a new Wyoming service with the Mac’s host/IP and port `10200`.
 
-``` sh
-script/run --piper '/usr/share/piper/piper' --voice en_US-lessac-medium --uri 'tcp://0.0.0.0:10200' --data-dir /data --download-dir /data 
-```
+> Tip: Additional voices can be downloaded in the system settings under `Accessibility -> Live Speech -> Voice -> ℹ️`. 
+>
+> if new voices are not showing in Home Assistant, try reloading the Wyoming service in Home Assistant
 
-## Docker Image
+### Uninstalling
 
-``` sh
-docker run -it -p 10200:10200 -v /path/to/local/data:/data rhasspy/wyoming-piper \
-    --voice en_US-lessac-medium
-```
+Re-run the installer and, when prompted: `Run in the background and on login?` enter `n`
 
-[Source](https://github.com/rhasspy/wyoming-addons/tree/master/piper)
+To completely remove all resources, delete the cloned repository folder.
+
+### Development
+
+- Install dev dependencies: 
+    ```bash
+    uv sync --extra dev
+    ```
+- Running in a terminal session:
+    ```bash 
+    uv run -m wyoming_macos_tts --help
+    ```
+- Running tests:
+    ```bash 
+    uv run -m pytest tests
+    ```
+
+---
+
+If you find this usefull and want to support future projects:
+
+<a href="https://www.buymeacoffee.com/openhoster" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"/>
+</a>

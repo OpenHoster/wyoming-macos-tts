@@ -1,0 +1,41 @@
+on:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  auto-format:
+    runs-on: [ nas ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install formatters
+        run: pip install black isort ruff
+
+      - name: Run isort
+        run: isort .
+
+      - name: Run black
+        run: black .
+
+      - name: Run ruff
+        run: ruff check . --fix
+
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "gitea-action[format]"
+          git config user.email "dummy@example.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "auto format"
+            git push
+          else
+            echo "No formatting changes to commit."
+          fi

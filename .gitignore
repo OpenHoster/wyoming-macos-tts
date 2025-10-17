@@ -16,3 +16,8 @@ __pycache__/
 .tox/
 
 /dist/
+
+.pytest_cache
+logs
+uv.lock
+WyomingTTS

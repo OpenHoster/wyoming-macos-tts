@@ -5,15 +5,15 @@ import asyncio
 import logging
 import math
 import tempfile
+import time
 import wave
-from typing import Any, Dict, Optional
+from typing import Optional
 
-from piper import PiperVoice, SynthesisConfig
 from sentence_stream import SentenceBoundaryDetector
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.error import Error
 from wyoming.event import Event
-from wyoming.info import Describe, Info
+from wyoming.info import Describe
 from wyoming.server import AsyncEventHandler
 from wyoming.tts import (
     Synthesize,
@@ -23,37 +23,29 @@ from wyoming.tts import (
     SynthesizeStopped,
 )
 
-from .download import ensure_voice_exists, find_voice
+from .info import get_wyoming_info
 
-_LOGGER = logging.getLogger(__name__)
-
-# Keep the most recently used voice loaded
-_VOICE: Optional[PiperVoice] = None
-_VOICE_NAME: Optional[str] = None
-_VOICE_LOCK = asyncio.Lock()
+_LOGGER = logging.getLogger("wyoming-macos-tts")
 
 
-class PiperEventHandler(AsyncEventHandler):
+class MacosTTSEventHandler(AsyncEventHandler):
     def __init__(
         self,
-        wyoming_info: Info,
         cli_args: argparse.Namespace,
-        voices_info: Dict[str, Any],
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
 
         self.cli_args = cli_args
-        self.wyoming_info_event = wyoming_info.event()
-        self.voices_info = voices_info
         self.is_streaming: Optional[bool] = None
         self.sbd = SentenceBoundaryDetector()
         self._synthesize: Optional[Synthesize] = None
 
     async def handle_event(self, event: Event) -> bool:
         if Describe.is_type(event.type):
-            await self.write_event(self.wyoming_info_event)
+            wyoming_info = await get_wyoming_info(self.cli_args)
+            await self.write_event(wyoming_info.event())
             _LOGGER.debug("Sent info")
             return True
 
@@ -161,77 +153,35 @@ class PiperEventHandler(AsyncEventHandler):
 
         # Resolve voice
         _LOGGER.debug("synthesize: raw_text=%s, text='%s'", raw_text, text)
-        voice_name: Optional[str] = None
-        voice_speaker: Optional[str] = None
-        if synthesize.voice is not None:
-            voice_name = synthesize.voice.name
-            voice_speaker = synthesize.voice.speaker
+        voice_name: Optional[str] = synthesize.voice.name
 
         if voice_name is None:
             # Default voice
             voice_name = self.cli_args.voice
 
-        if voice_name == self.cli_args.voice:
-            # Default speaker
-            voice_speaker = voice_speaker or self.cli_args.speaker
-
-        assert voice_name is not None
-
-        # Resolve alias
-        voice_info = self.voices_info.get(voice_name, {})
-        voice_name = voice_info.get("key", voice_name)
-        assert voice_name is not None
-
-        with tempfile.NamedTemporaryFile(mode="wb+", suffix=".wav") as output_file:
-            async with _VOICE_LOCK:
-                if voice_name != _VOICE_NAME:
-                    # Load new voice
-                    _LOGGER.debug("Loading voice: %s", _VOICE_NAME)
-                    ensure_voice_exists(
-                        voice_name,
-                        self.cli_args.data_dir,
-                        self.cli_args.download_dir,
-                        self.voices_info,
-                    )
-                    model_path, config_path = find_voice(
-                        voice_name, self.cli_args.data_dir
-                    )
-                    _VOICE = PiperVoice.load(
-                        model_path, config_path, use_cuda=self.cli_args.use_cuda
-                    )
-                    _VOICE_NAME = voice_name
-
-                assert _VOICE is not None
-
-                syn_config = SynthesisConfig()
-                if voice_speaker is not None:
-                    syn_config.speaker_id = _VOICE.config.speaker_id_map.get(
-                        voice_speaker
-                    )
-                    if syn_config.speaker_id is None:
-                        try:
-                            # Try to interpret as an id
-                            syn_config.speaker_id = int(voice_speaker)
-                        except ValueError:
-                            pass
-
-                    if syn_config.speaker_id is None:
-                        _LOGGER.warning(
-                            "No speaker '%s' for voice '%s'", voice_speaker, voice_name
-                        )
-
-                if self.cli_args.length_scale is not None:
-                    syn_config.length_scale = self.cli_args.length_scale
-
-                if self.cli_args.noise_scale is not None:
-                    syn_config.noise_scale = self.cli_args.noise_scale
-
-                if self.cli_args.noise_w_scale is not None:
-                    syn_config.noise_w_scale = self.cli_args.noise_w_scale
-
-                wav_writer: wave.Wave_write = wave.open(output_file, "wb")
-                with wav_writer:
-                    _VOICE.synthesize_wav(text, wav_writer, syn_config)
+        with (
+            tempfile.NamedTemporaryFile(mode="wb+", suffix=".wav") as output_file,
+            tempfile.NamedTemporaryFile(mode="wb+", suffix=".m4a") as m4a_file,
+        ):
+            command = f"say -o {m4a_file.name} '{text}'"
+            command += f" -v '{voice_name}'" if voice_name else ""
+            command += " && ffmpeg -y -loglevel quiet"
+            command += f" -i {m4a_file.name} {output_file.name}"
+            _LOGGER.debug(f"Runnning command: {command}")
+            start_time = time.time()
+            proc = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+            end_time = time.time()
+            _LOGGER.debug(
+                f"Command execution duration: {end_time - start_time} seconds"
+            )
+            if proc.returncode != 0:
+                _LOGGER.error(f"Command failed with return code {proc.returncode}")
+                _LOGGER.error(stderr.decode())
 
             output_file.seek(0)
 

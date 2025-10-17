@@ -1,19 +1,19 @@
 [project]
-name = "wyoming-piper"
-version = "2.0.0"
-description = "Wyoming Server for Piper"
+name = "wyoming-macos-tts"
+version = "2.0.0.0"
+description = "Wyoming server for Text-to-Speech on macOS"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "Michael Hansen", email = "mike@rhasspy.org"}
+    {name = "Michael Hansen", email = "mike@rhasspy.org"},
+    {name = "OpenHoster", email = "openhosterlab@gmail.com"}
 ]
-keywords = ["rhasspy", "wyoming", "piper", "tts"]
+keywords = ["rhasspy", "wyoming", "macos", "tts"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Topic :: Text Processing :: Linguistic",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -22,47 +22,28 @@ classifiers = [
 ]
 dependencies = [
     "wyoming>=1.7.2,<1.8",
-    "regex==2024.11.6",
-    "piper-tts==1.3.0",
     "sentence-stream==1.1.0",
 ]
 
 [project.urls]
-Homepage = "http://github.com/rhasspy/wyoming-piper"
+Homepage = "https://github.com/openhoster/wyoming-macos-tts"
 
 [project.scripts]
-wyoming-piper = "wyoming_piper.__main__:run"
+wyoming-macos-tts = "wyoming_macos_tts.__main__:run"
 
 [tool.setuptools.packages.find]
-include = ["wyoming_piper"]
+include = ["wyoming_macos_tts"]
 exclude = ["tests", "tests.*"]
-
-[tool.setuptools.package-data]
-wyoming_piper = ["voices.json"]
 
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.black]
-line-length = 88
-
-[tool.isort]
-profile = "black"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
-[tool.mypy]
-check_untyped_defs = true
-disallow_untyped_defs = true
-
 [project.optional-dependencies]
 dev = [
-    "black==24.8.0",
-    "flake8==7.1.1",
-    "mypy==1.14.0",
-    "pylint==3.2.7",
     "pytest==8.3.4",
     "pytest-asyncio==1.1.0",
     "build==1.2.2",

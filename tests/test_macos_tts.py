@@ -1,4 +1,4 @@
-"""Tests for wyoming-piper"""
+"""Tests for wyoming-macos-tts"""
 
 import asyncio
 import sys
@@ -17,22 +17,20 @@ from wyoming.tts import Synthesize, SynthesizeVoice
 from .dtw import compute_optimal_path
 
 _DIR = Path(__file__).parent
-_LOCAL_DIR = _DIR.parent / "local"
 _TIMEOUT = 60
 
 
 @pytest.mark.asyncio
-async def test_piper() -> None:
+async def test_macos_tts() -> None:
     proc = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
-        "wyoming_piper",
+        "wyoming_macos_tts",
         "--uri",
         "stdio://",
+        "--debug",
         "--voice",
-        "en_US-ryan-low",
-        "--data-dir",
-        str(_LOCAL_DIR),
+        "Daniel (English (UK))",
         stdin=PIPE,
         stdout=PIPE,
     )
@@ -52,13 +50,18 @@ async def test_piper() -> None:
         assert len(info.tts) == 1, "Expected one tts service"
         tts = info.tts[0]
         assert len(tts.voices) > 0, "Expected at least one voice"
-        voice_model = next((v for v in tts.voices if v.name == "en_US-ryan-low"), None)
-        assert voice_model is not None, "Expected ryan voice"
+        print(tts.voices)
+        voice_model = next(
+            (v for v in tts.voices if v.name == "Daniel (English (UK))"), None
+        )
+        assert voice_model is not None, "Expected Daniel voice"
         break
 
     # Synthesize text
     await async_write_event(
-        Synthesize("This is a test.", voice=SynthesizeVoice("en_US-ryan-low")).event(),
+        Synthesize(
+            "This is a test.", voice=SynthesizeVoice("Daniel (English (UK))")
+        ).event(),
         proc.stdin,
     )
 
