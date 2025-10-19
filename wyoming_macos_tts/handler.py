@@ -163,25 +163,12 @@ class MacosTTSEventHandler(AsyncEventHandler):
             tempfile.NamedTemporaryFile(mode="wb+", suffix=".wav") as output_file,
             tempfile.NamedTemporaryFile(mode="wb+", suffix=".m4a") as m4a_file,
         ):
-            command = f"say -o {m4a_file.name} '{text}'"
-            command += f" -v '{voice_name}'" if voice_name else ""
-            command += " && ffmpeg -y -loglevel quiet"
-            command += f" -i {m4a_file.name} {output_file.name}"
-            _LOGGER.debug(f"Runnning command: {command}")
-            start_time = time.time()
-            proc = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await proc.communicate()
-            end_time = time.time()
-            _LOGGER.debug(
-                f"Command execution duration: {end_time - start_time} seconds"
-            )
-            if proc.returncode != 0:
-                _LOGGER.error(f"Command failed with return code {proc.returncode}")
-                _LOGGER.error(stderr.decode())
+            command = ["say", "-o", m4a_file.name, text]
+            command += ["-v", voice_name] if voice_name else []
+            await self.run_command(command)
+            command = ["ffmpeg", "-y", "-loglevel", "quiet"]
+            command += ["-i", m4a_file.name, output_file.name]
+            await self.run_command(command)
 
             output_file.seek(0)
 
@@ -223,3 +210,18 @@ class MacosTTSEventHandler(AsyncEventHandler):
                 await self.write_event(AudioStop().event())
 
         return True
+
+    async def run_command(self, command):
+        _LOGGER.debug(f"Runnning command: {' '.join(command)}")
+        start_time = time.time()
+        proc = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        end_time = time.time()
+        _LOGGER.debug(f"Command execution duration: {end_time - start_time} seconds")
+        if proc.returncode != 0:
+            _LOGGER.error(stderr.decode())
+            raise Exception(f"Command failed with return code {proc.returncode}")
